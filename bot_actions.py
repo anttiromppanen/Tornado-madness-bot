@@ -5,9 +5,10 @@ from typing import Literal
 TreeOrBuilding = Literal["tree", "building"]
 
 class Bot:
-    def __init__(self, MouseController, KeyboardController, MouseButton, screenx_center, screeny_center):
+    def __init__(self, MouseController, KeyboardController, Screenshots, MouseButton, screenx_center, screeny_center):
         self.MouseController = MouseController
         self.KeyboardController = KeyboardController
+        self.Screenshots = Screenshots
         self.MouseButton = MouseButton
         self.screenx_center = screenx_center
         self.screeny_center = screeny_center
@@ -23,7 +24,7 @@ class Bot:
         time.sleep(0.1)
         self.KeyboardController.release("2")
 
-    def click_buy_button(self, location, buy_button_locations):
+    def click_buy_button(self, buy_button_locations):
         for location in buy_button_locations:
             self.MouseController.position = location
             self.MouseController.click(self.MouseButton.left, 1)
@@ -51,3 +52,31 @@ class Bot:
         if tree_or_building not in {"tree", "building"}:
             raise ValueError("tree_or_building must be 'tree' or 'building'")
         self.MouseController.position = decision_location_dict[tree_or_building] or (self.screenx_center, self.screeny_center)
+
+    def handle_buy_menu(self, buy_button_locations, model):
+        # click buy buttons in view
+        self.click_buy_button(buy_button_locations)
+
+        # scroll down to see if there are more buy buttons
+        # take screenshot and run model again
+        for _ in range(2):
+            self.MouseController.position = (200, 200)
+            time.sleep(0.5)
+            self.MouseController.scroll(20, 0)
+            time.sleep(1)
+
+            boxes, classes, names, confidences = self.Screenshots.take_and_process_screenshot(model)
+            buy_button_locations = []
+
+            for box, cls, conf in zip(boxes, classes, confidences):
+                x1, y1, x2, y2 = box
+
+                center_x = (x1 + x2) / 2
+                center_y = (y1 + y2) / 2
+
+                name = names[int(cls)]
+
+                if name == "buy":
+                    buy_button_locations.append((center_x, center_y))
+
+                self.click_buy_button(buy_button_locations)

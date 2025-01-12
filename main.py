@@ -14,7 +14,7 @@ from screenshots import Screenshots
 mouse = Controller()
 keyboard = KeyboardController()
 
-bot_actions = Bot(mouse, keyboard, MouseButton, screenx_center, screeny_center)
+bot_actions = Bot(mouse, keyboard, Screenshots, MouseButton, screenx_center, screeny_center)
 
 def run_bot(decision_dict, decision_location_dict, decision_distance_dict, buy_button_locations, num_of_objects_under_400_distance, num_of_objects_under_600_distance, model):
     if num_of_objects_under_400_distance > 4:
@@ -22,40 +22,8 @@ def run_bot(decision_dict, decision_location_dict, decision_distance_dict, buy_b
     if num_of_objects_under_600_distance > 10:
         bot_actions.press_meteorites()
 
-    # click buy buttons
     if decision_dict["buy"] or decision_dict["poor"]:
-        for location in buy_button_locations:
-            mouse.position = location
-            mouse.click(MouseButton.left, 1)
-            time.sleep(1)
-        
-        # scroll down to see if there are more buy buttons
-        # take screenshot and run model again
-        for _ in range(2):
-            mouse.position = (200, 200)
-            time.sleep(0.5)
-            mouse.scroll(20, 0)
-            time.sleep(1)
-
-            boxes, classes, names, confidences = Screenshots.take_and_process_screenshot(model)
-            buy_button_locations = []
-
-            for box, cls, conf in zip(boxes, classes, confidences):
-                x1, y1, x2, y2 = box
-
-                center_x = (x1 + x2) / 2
-                center_y = (y1 + y2) / 2
-
-                name = names[int(cls)]
-
-                if name == "buy":
-                    buy_button_locations.append((center_x, center_y))
-
-            for location in buy_button_locations:
-                mouse.position = location
-                mouse.click(MouseButton.left, 1)
-                time.sleep(1)
-        
+        bot_actions.handle_buy_menu(buy_button_locations, model)
 
     if decision_dict["next"]:
         bot_actions.click_next_button(decision_location_dict)
