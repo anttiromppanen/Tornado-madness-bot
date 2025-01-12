@@ -2,30 +2,24 @@ import pyautogui
 
 screen_width, screen_height = pyautogui.size()
 
-# tracks objects seen in the last frame
-decision_dict = {
-    "buy": False,
-    "play": False,
-    "continue": False,
-    "next": False,
-    "tornado": False,
-    "tree": False,
-    "fuel": False,
-    "building": False,
-    "no_thanks": False,
-    "poor": False,
+object_class_names = {
+    "buy": True,
+    "play": True,
+    "continue": True,
+    "next": True,
+    "tornado": True,
+    "tree": True,
+    "fuel": True,
+    "building": True,
+    "no_thanks": True,
+    "poor": True,
 }
 
-# tracks location of objects seen in the last frame
-decision_location_dict = {
+button_locations = {
     "buy": None,
     "play": None,
     "continue": None,
     "next": None,
-    "tornado": None,
-    "tree": None,
-    "fuel": None,
-    "building": None,
     "no_thanks": None,
     "poor": None,
 }
@@ -39,3 +33,8 @@ decision_distance_dict = {
 
 screenx_center = screen_width / 2
 screeny_center = screen_height / 2
+
+building_tree_scores = {
+    "building": 2.5,
+    "tree": 1,
+}

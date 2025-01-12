@@ -1,119 +1,117 @@
 import threading
 import copy
 import pyautogui
-import time
+import numpy
 
 from ultralytics import YOLO
 from pynput.mouse import Controller, Button as MouseButton
 from pynput.keyboard import Controller as KeyboardController
 
-from const.const import decision_dict, decision_location_dict, decision_distance_dict, screenx_center, screeny_center
+from const.const import screen_width, screen_height, screenx_center, screeny_center, building_tree_scores, button_locations
 from bot_actions import Bot
 from screenshots import Screenshots
+
+from object_clusters import ObjectClusters
 
 mouse = Controller()
 keyboard = KeyboardController()
 
 bot_actions = Bot(mouse, keyboard, Screenshots, MouseButton, screenx_center, screeny_center)
 
-def run_bot(decision_dict, decision_location_dict, decision_distance_dict, buy_button_locations, num_of_objects_under_400_distance, num_of_objects_under_600_distance, model):
-    if num_of_objects_under_400_distance > 4:
-        bot_actions.press_lightning()
-    if num_of_objects_under_600_distance > 10:
-        bot_actions.press_meteorites()
-
-    if decision_dict["buy"] or decision_dict["poor"]:
-        bot_actions.handle_buy_menu(buy_button_locations, model)
-
-    if decision_dict["next"]:
-        bot_actions.click_next_button(decision_location_dict)
-        return
-
-    # click play button
-    if decision_dict["play"]:
-        bot_actions.click_play_button(decision_location_dict)
-        return
-
-    if decision_dict["continue"]:
-        mouse.position = decision_location_dict["continue"]
-        mouse.click(MouseButton.left, 1)
-        return
-    
-    if decision_dict["no_thanks"]:
-        mouse.position = decision_location_dict["no_thanks"]
-        mouse.click(MouseButton.left, 1)
-        return
-
-    # go to fuel if it is close
-    if decision_dict["fuel"] and decision_distance_dict["fuel"] < 600:
-        mouse.position = decision_location_dict["fuel"]
-        return
-
-    if not decision_dict["tree"] and not decision_dict["building"]:
-        return
-
-    tree_distance = decision_distance_dict["tree"]
-    building_distance = decision_distance_dict["building"] - 150
-
-    # go to tree or building or center if not close to any
-    if decision_dict["fuel"] and decision_distance_dict["fuel"] < 600:
-        mouse.position = decision_location_dict["fuel"]
-    elif tree_distance < building_distance:
-        bot_actions.move_to_tree_or_building(decision_location_dict, "tree")
-    else:
-        bot_actions.move_to_tree_or_building(decision_location_dict, "building")
-
-def take_screenshot(stop_event: threading.Event, model):
+def take_screenshot_new(stop_event: threading.Event, model):
     pyautogui.FAILSAFE = False
     
     while not stop_event.is_set():
-        decision_dict_deepcopy = copy.deepcopy(decision_dict)
-        decision_location_dict_deepcopy = copy.deepcopy(decision_location_dict)
-        decision_distance_dict_deepcopy = copy.deepcopy(decision_distance_dict)
+        boxes, classes, names, conf = Screenshots.take_and_process_screenshot(model)
 
         buy_button_locations = []
-        num_of_objects_under_400_distance = 0
-        num_of_objects_under_600_distance = 0
 
-        boxes, classes, names, confidences = Screenshots.take_and_process_screenshot(model)
+        # tracks closest fuel location & distance if any
+        fuel_location = None
+        closest_fuel_distance = numpy.inf
 
-        #process result list
-        for box, cls, conf in zip(boxes, classes, confidences):
+        # track objects in distance for lightning & meteor usage
+        num_objects_around_400_distance = 0
+        num_objects_around_600_distance = 0
+
+        # divide screen into 6 equal sized blocks, and track objects on the blocks
+        object_clusters = ObjectClusters(screen_width, screen_height)
+        obj_array = numpy.zeros((2,3)) # tracks object sums in blocks
+        obj_array_closest_distances = numpy.full((2,3), numpy.inf) # tracks distance to closest object by blocks
+        obj_array_closest_distances_x_y = numpy.full((2,3), numpy.inf, dtype=object) # tracks (x,y) of closest object on blocks
+
+        # O(1) tracking for block with highest score sum
+        max_col_num, max_row_num, max_object_cluster_sum = -1, -1, -1
+
+        button_in_view = False
+        button_locations_deepcopy = copy.deepcopy(button_locations)
+
+        for box, cls in zip(boxes, classes):
+            name = names[int(cls)]
+            
             x1, y1, x2, y2 = box
 
             center_x = (x1 + x2) / 2
             center_y = (y1 + y2) / 2
 
-            name = names[int(cls)]
 
-            decision_dict_deepcopy[name] = True
+            if name in button_locations_deepcopy:
+                button_in_view = True
+                button_locations_deepcopy[name] = (center_x, center_y)
 
-            if name == "tree" or name == "building" or name == "fuel":
-                distance = ((center_x - screenx_center) ** 2 + (center_y - screeny_center) **2) **.5
-
-                if distance <= 400:
-                    num_of_objects_under_400_distance += 1
-                if distance <= 600:
-                    num_of_objects_under_600_distance += 1
-
-                decision_distance_dict_deepcopy[name] = min(decision_distance_dict_deepcopy[name], distance)
-
-                if distance == decision_distance_dict_deepcopy[name]:
-                    decision_location_dict_deepcopy[name] = (center_x, center_y)
-            elif name == "buy":
+            if name == "buy":
                 buy_button_locations.append((center_x, center_y))
-            else:
-                decision_location_dict_deepcopy[name] = (center_x, center_y)
 
-        run_bot(decision_dict_deepcopy, decision_location_dict_deepcopy, decision_distance_dict_deepcopy, buy_button_locations, num_of_objects_under_400_distance, num_of_objects_under_600_distance, model)
+            distance = ((center_x - screenx_center) ** 2 + (center_y - screeny_center) **2) **.5
 
+            if name == "fuel":
+                if distance < closest_fuel_distance:
+                    closest_fuel_distance = distance
+                    fuel_location = (center_x, center_y)
 
+            if name != "tree" and name != "building": continue
+
+            # track trees and buildings inside specific distance ranges
+            if distance <= 400:
+                num_objects_around_400_distance += 1
+            elif distance <= 600:
+                num_objects_around_600_distance += 1
+
+            obj_column, obj_row = object_clusters.object_position_in_grid(center_x, center_y)
+            obj_array[obj_row][obj_column] += building_tree_scores[name]
+
+            if distance < obj_array_closest_distances[obj_row][obj_column]:
+                obj_array_closest_distances[obj_row][obj_column] = distance
+                obj_array_closest_distances_x_y[obj_row][obj_column] = (center_x, center_y)
+
+            if obj_array[obj_row][obj_column] == max_object_cluster_sum and distance < obj_array_closest_distances[obj_row, obj_column]:
+                max_object_cluster_sum = obj_array[obj_row][obj_column]
+                max_col_num = obj_column
+                max_row_num = obj_row
+
+            if obj_array[obj_row][obj_column] > max_object_cluster_sum:
+                max_object_cluster_sum = obj_array[obj_row][obj_column]
+                max_col_num = obj_column
+                max_row_num = obj_row
+
+        bot_actions.run_bot(
+            obj_array_closest_distances_x_y, 
+            max_col_num, 
+            max_row_num, 
+            button_in_view, 
+            button_locations_deepcopy, 
+            buy_button_locations, 
+            fuel_location,
+            closest_fuel_distance,
+            num_objects_around_400_distance,
+            num_objects_around_600_distance,
+            model)
 
 def main():
     model = YOLO("./data/model/best.pt")
     stop_event = threading.Event()
 
-    screenshot_thread = threading.Thread(target=take_screenshot, args=(stop_event, model))
+    screenshot_thread = threading.Thread(target=take_screenshot_new, args=(stop_event, model))
     screenshot_thread.start()
 
 if __name__ == "__main__":
