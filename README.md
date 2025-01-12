@@ -28,3 +28,7 @@ python3 main.py
 - Works currently only on single screen setups
 - The bot should work, but is currently very simple in decision making.
 - Sometimes gets stuck in a decision loop between two objects
+
+## Credits
+
+Based on the tutorial on https://youtu.be/PDzifxuEric
