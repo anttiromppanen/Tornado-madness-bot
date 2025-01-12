@@ -57,7 +57,7 @@ class Bot:
             self.MouseController.position = (200, 200)
             time.sleep(0.5)
             self.MouseController.scroll(20, 0)
-            time.sleep(1)
+            time.sleep(0.5)
 
             boxes, classes, names, confidences = self.Screenshots.take_and_process_screenshot(model)
             buy_button_locations = []
@@ -88,8 +88,8 @@ class Bot:
                 num_objects_around_600_distance,
                 model):
         if button_in_view:
-            # if button_locations_deepcopy["buy"] != None or button_locations_deepcopy["poor"] != None:
-            #     self.handle_buy_menu(buy_button_locations, model)
+            if button_locations_deepcopy["buy"] != None or button_locations_deepcopy["poor"] != None:
+                self.handle_buy_menu(buy_button_locations, model)
 
             if button_locations_deepcopy["continue"] != None:
                 self.click_menu_button("continue", button_locations_deepcopy)
