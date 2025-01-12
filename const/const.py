@@ -1,3 +1,7 @@
+import pyautogui
+
+screen_width, screen_height = pyautogui.size()
+
 # tracks objects seen in the last frame
 decision_dict = {
     "buy": False,
@@ -33,5 +37,5 @@ decision_distance_dict = {
     "building": float("inf"),
 }
 
-screenx_center = 1920 / 2
-screeny_center = 1080 / 2
+screenx_center = screen_width / 2
+screeny_center = screen_height / 2
