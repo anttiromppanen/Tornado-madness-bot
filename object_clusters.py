@@ -1,11 +1,13 @@
 class ObjectClusters:
-    def __init__(self, screen_width, screen_height):
+    def __init__(self, screen_width, screen_height, cluster_grid_columns, cluster_grid_rows):
         self.screen_width = screen_width
         self.screen_height = screen_height
+        self.cluster_grid_columns = cluster_grid_columns
+        self.cluster_grid_rows = cluster_grid_rows
 
         # divide screen into 6 equal sized blocks
-        self.block_width = self.screen_width // 3
-        self.block_height = self.screen_height // 2
+        self.block_width = self.screen_width // self.cluster_grid_columns
+        self.block_height = self.screen_height // self.cluster_grid_rows
 
         # number of blocks to use in array
         self.blocks_x = self.screen_width // self.block_width - 1

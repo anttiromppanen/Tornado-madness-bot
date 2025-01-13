@@ -2,6 +2,7 @@ import time
 import numpy
 
 from typing import Literal
+from helpers import is_rgb_color_water
 
 TreeOrBuilding = Literal["tree", "building"]
 
@@ -38,14 +39,6 @@ class Bot:
         time.sleep(0.5)
         self.MouseController.position = button_locations_deepcopy[button_type]
         self.MouseController.click(self.MouseButton.left, 1)
-
-    def move_to_fuel(self, decision_location_dict):
-        self.MouseController.position = decision_location_dict["fuel"]
-
-    def move_to_tree_or_building(self, decision_location_dict, tree_or_building: TreeOrBuilding):
-        if tree_or_building not in {"tree", "building"}:
-            raise ValueError("tree_or_building must be 'tree' or 'building'")
-        self.MouseController.position = decision_location_dict[tree_or_building] or (self.screenx_center, self.screeny_center)
 
     def handle_buy_menu(self, buy_button_locations, model):
         # click buy buttons in view
@@ -86,6 +79,8 @@ class Bot:
                 closest_fuel_distance,
                 num_objects_around_400_distance,
                 num_objects_around_600_distance,
+                max_object_cluster_sum,
+                pixel_color_top_left_corner,
                 model):
         if button_in_view:
             if button_locations_deepcopy["buy"] != None or button_locations_deepcopy["poor"] != None:
@@ -100,11 +95,19 @@ class Bot:
         else: 
             if fuel_location != None and closest_fuel_distance <= 1000:
                 self.MouseController.position = fuel_location
-                time.sleep(1.5)
+            elif max_object_cluster_sum < 7:
+                # starts moving upwards if running into water
+                if is_rgb_color_water(pixel_color_top_left_corner):
+                    top_right_x = self.screenx_center + 200
+                    top_right_y = self.screeny_center - 100
+                    self.MouseController.position = (top_right_x, top_right_y)
+                else:
+                # top left corner
+                    self.MouseController.position = (10, 10)
             elif obj_array_closest_distances_x_y[max_row_num][max_col_num] != numpy.inf:
                 self.MouseController.position = obj_array_closest_distances_x_y[max_row_num][max_col_num]
             else:
-                self.MouseController.position = (0, 0)
+                self.MouseController.position = (10, 10)
 
             if num_objects_around_600_distance >= 10:
                 self.press_meteorites()

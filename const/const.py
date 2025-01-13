@@ -34,6 +34,11 @@ decision_distance_dict = {
 screenx_center = screen_width / 2
 screeny_center = screen_height / 2
 
+cluster_grid_columns = 2
+cluster_grid_rows = 2
+
+water_color = (79, 195, 247)
+
 building_tree_scores = {
     "building": 2.5,
     "tree": 1,

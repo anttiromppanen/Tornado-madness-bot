@@ -7,7 +7,7 @@ from ultralytics import YOLO
 from pynput.mouse import Controller, Button as MouseButton
 from pynput.keyboard import Controller as KeyboardController
 
-from const.const import screen_width, screen_height, screenx_center, screeny_center, building_tree_scores, button_locations
+from const.const import screen_width, screen_height, screenx_center, screeny_center, building_tree_scores, button_locations, cluster_grid_columns, cluster_grid_rows
 from bot_actions import Bot
 from screenshots import Screenshots
 
@@ -17,13 +17,14 @@ mouse = Controller()
 keyboard = KeyboardController()
 
 bot_actions = Bot(mouse, keyboard, Screenshots, MouseButton, screenx_center, screeny_center)
+object_clusters = ObjectClusters(screen_width, screen_height, cluster_grid_columns, cluster_grid_rows)
 
 def take_screenshot_new(stop_event: threading.Event, model):
     pyautogui.FAILSAFE = False
     
     while not stop_event.is_set():
-        boxes, classes, names, conf = Screenshots.take_and_process_screenshot(model)
-
+        boxes, classes, names, pixel_color_top_left_corner = Screenshots.take_and_process_screenshot(model)
+        
         buy_button_locations = []
 
         # tracks closest fuel location & distance if any
@@ -34,11 +35,10 @@ def take_screenshot_new(stop_event: threading.Event, model):
         num_objects_around_400_distance = 0
         num_objects_around_600_distance = 0
 
-        # divide screen into 6 equal sized blocks, and track objects on the blocks
-        object_clusters = ObjectClusters(screen_width, screen_height)
-        obj_array = numpy.zeros((2,3)) # tracks object sums in blocks
-        obj_array_closest_distances = numpy.full((2,3), numpy.inf) # tracks distance to closest object by blocks
-        obj_array_closest_distances_x_y = numpy.full((2,3), numpy.inf, dtype=object) # tracks (x,y) of closest object on blocks
+        # divide screen into n equal sized blocks, and track objects on the blocks
+        obj_array = numpy.zeros((cluster_grid_rows, cluster_grid_columns)) # tracks object sums in blocks
+        obj_array_closest_distances = numpy.full((cluster_grid_rows, cluster_grid_columns), numpy.inf) # tracks distance to closest object by blocks
+        obj_array_closest_distances_x_y = numpy.full((cluster_grid_rows, cluster_grid_columns), numpy.inf, dtype=object) # tracks (x,y) of closest object on blocks
 
         # O(1) tracking for block with highest score sum
         max_col_num, max_row_num, max_object_cluster_sum = -1, -1, -1
@@ -105,6 +105,8 @@ def take_screenshot_new(stop_event: threading.Event, model):
             closest_fuel_distance,
             num_objects_around_400_distance,
             num_objects_around_600_distance,
+            max_object_cluster_sum,
+            pixel_color_top_left_corner,
             model)
 
 def main():
