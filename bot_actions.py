@@ -111,5 +111,5 @@ class Bot:
 
             if num_objects_around_600_distance >= 10:
                 self.press_meteorites()
-            if num_objects_around_400_distance >= 6:
+            if num_objects_around_400_distance >= 8:
                 self.press_lightning()
